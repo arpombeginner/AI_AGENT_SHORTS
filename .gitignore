@@ -1,0 +1,25 @@
+# API KEY
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual Environment
+venv/
+.venv/
+
+# Output
+input/
+output/
+chunks/
+transcript/
+temp/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
