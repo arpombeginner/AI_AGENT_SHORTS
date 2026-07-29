@@ -1,7 +1,6 @@
 yt-dlp
 openai-whisper
-ollama
 ffmpeg-python
 moviepy
 python-dotenv
-
+google-genai
