@@ -14,77 +14,69 @@ from config import (
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-
 PROMPT = """
-Kamu adalah editor YouTube profesional.
+Kamu adalah editor YouTube Shorts profesional.
 
-Analisis transcript berikut. Transcript ini memiliki timestamp asli
-dalam format [MM:SS - MM:SS] di atas setiap baris teks.
+Berikut adalah transcript lengkap sebuah video.
 
-Tentukan SATU bagian yang PALING cocok dijadikan YouTube Shorts.
+Transcript memiliki timestamp asli dalam format:
 
-WAJIB gunakan timestamp ASLI yang ada di transcript (jangan menebak
-atau mengarang waktu). start_time dan end_time harus persis sama
-dengan salah satu timestamp yang muncul di transcript, atau gabungan
-beberapa timestamp yang berurutan.
+[MM:SS - MM:SS]
 
-Durasi (end_time - start_time) idealnya antara 20 - 60 detik, cocok
-untuk format YouTube Shorts.
+Tugasmu:
 
-Berikan jawaban HANYA dalam format JSON murni, TANPA markdown code
-fence, TANPA teks tambahan apapun sebelum atau sesudah JSON.
+1. Analisis seluruh transcript.
+2. Pilih MAKSIMAL 3 bagian terbaik.
+3. Jangan memilih bagian yang overlap.
+4. Gunakan timestamp ASLI yang ada di transcript.
+5. Durasi ideal 20-60 detik.
+6. Prioritaskan bagian yang:
+   - Hook kuat
+   - Viral
+   - Mengandung insight
+   - Lucu
+   - Emosional
 
-Format wajib:
-{
-  "score": 9.8,
-  "title": "Judul Shorts",
-  "start_time": "02:04",
-  "end_time": "02:32",
-  "reason": "Alasan mengapa bagian ini menarik."
-}
+Kembalikan HANYA JSON.
+
+Format:
+
+[
+    {
+        "score":9.8,
+        "title":"Judul",
+        "start_time":"02:04",
+        "end_time":"02:38",
+        "reason":"..."
+    }
+]
 
 Transcript:
 
 """
 
-
-def extract_json(raw_text):
-    """
-    Membersihkan output Gemini dari markdown code fence (```json ... ```)
-    kalau ada, lalu parse jadi dict Python.
-    """
-
-    text = raw_text.strip()
-
-    # Hapus code fence ```json ... ``` atau ``` ... ```
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
+def extract_json(text):
 
     text = text.strip()
 
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        print(f"⚠️  Gagal parse JSON: {e}")
-        print(f"Raw text: {raw_text}")
-        return None
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text)
+        text = re.sub(r"```$", "", text)
+        text = text.strip()
+
+    return json.loads(text)
 
 
-def analyze_chunks():
-
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
-    hasil = []
+def load_all_chunks():
 
     files = sorted(os.listdir(CHUNK_FOLDER))
+
+    transcript = ""
 
     for file in files:
 
         if not file.endswith(".txt"):
             continue
-
-        print(f"🔍 Menganalisis {file}")
 
         with open(
             os.path.join(CHUNK_FOLDER, file),
@@ -92,33 +84,50 @@ def analyze_chunks():
             encoding="utf-8"
         ) as f:
 
-            text = f.read()
+            transcript += f.read()
+            transcript += "\n\n"
 
-        prompt = PROMPT + text
+    return transcript
 
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt
-        )
 
-        parsed = extract_json(response.text)
+def analyze_chunks():
 
-        hasil.append({
-            "chunk": file,
-            "result": parsed if parsed is not None else response.text
-        })
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    transcript = load_all_chunks()
+
+    print("🔍 Gemini sedang menganalisis seluruh video...")
+
+    response = client.models.generate_content(
+
+        model=GEMINI_MODEL,
+
+        contents=PROMPT + transcript
+
+    )
+
+    hasil = extract_json(response.text)
 
     with open(
+
         CLIPS_JSON,
+
         "w",
+
         encoding="utf-8"
+
     ) as f:
 
         json.dump(
+
             hasil,
+
             f,
+
             indent=4,
+
             ensure_ascii=False
+
         )
 
     print("✅ Analisis selesai.")
